@@ -8,136 +8,103 @@ export interface CheckResult {
   error?: string;
 }
 
-// CORS proxy
-const PROXY_URL = 'https://corsproxy.io/?';
+// Multiple fallback proxies
+const PROXY_URLS = [
+  'https://api.allorigins.win/raw?url=',
+  'https://thingproxy.freeboard.io/fetch/',
+  'https://corsproxy.io/?'
+];
 
+// Main single URL check
 export async function checkTracker(originalUrl: string): Promise<CheckResult> {
   const start = performance.now();
-
-  // Define log and err here to ensure scope
-  const log = (...args: any[]) => {
-    if (import.meta.env.DEV) {
-      console.log('[TorrentAnalyzer] Checker:', ...args);
-    }
-  };
-  const err_log = (...args: any[]) => {
-    if (import.meta.env.DEV) {
-      console.error('[TorrentAnalyzer] Checker:', ...args);
-    }
-  };
+  const log = (...args: any[]) => import.meta.env.DEV && console.log('[TrackerCheck]', ...args);
+  const err = (...args: any[]) => import.meta.env.DEV && console.error('[TrackerCheck]', ...args);
 
   let url = originalUrl;
 
-  // CASE 1: HTTP on HTTPS → Proxy
-  if (location.protocol === 'https:' && url.startsWith('http://')) {
-    const proxyUrl = PROXY_URL + encodeURIComponent(url);
-    log(`Using proxy for HTTP: ${proxyUrl}`);
-    return await tryProxy(proxyUrl, originalUrl, start, log, err_log);
-  }
-
-  // CASE 2: UDP
+  // UDP trackers not supported
   if (url.startsWith('udp://')) {
-    log(`Skipping UDP: ${url}`);
-    return { url, success: false, time: 0, error: 'UDP not supported' };
+    return { url, success: false, time: 0, error: 'UDP not supported in browser' };
   }
 
-  // CASE 3: Direct
-  log(`Direct check: ${url}`);
-  return await tryDirect(url, originalUrl, start, log, err_log);
+  // Use proxy for HTTP trackers when on HTTPS
+  if (location.protocol === 'https:' && url.startsWith('http://')) {
+    for (const base of PROXY_URLS) {
+      const result = await tryProxy(base + encodeURIComponent(url), originalUrl, start, log, err);
+      if (result.success) return result;
+    }
+    const time = Math.round(performance.now() - start);
+    return { url: originalUrl, success: false, time, error: 'All proxies failed or timed out' };
+  }
+
+  // Direct HTTPS check
+  return await tryDirect(url, originalUrl, start, log, err);
 }
 
-// Direct fetch helper
-async function tryDirect(url: string, originalUrl: string, start: number, log: Function, err_log: Function): Promise<CheckResult> {
+// Direct HEAD request
+async function tryDirect(url: string, originalUrl: string, start: number, log: Function, err: Function): Promise<CheckResult> {
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 5000);
+  const timeout = setTimeout(() => controller.abort(), 7000);
 
   try {
-    await fetch(url, {
-      method: 'HEAD',
-      signal: controller.signal,
-      mode: 'no-cors',
-      credentials: 'omit'
-    });
+    const res = await fetch(url, { method: 'HEAD', mode: 'no-cors', credentials: 'omit', signal: controller.signal });
+    clearTimeout(timeout);
+    const time = Math.round(performance.now() - start);
 
-    clearTimeout(timeoutId);
-    const time = Math.round(performance.now() - start);
-    log(`Direct success: ${url} (${time}ms)`);
-    return { url: originalUrl, success: true, time };
+    if (res.type === 'opaque' || res.ok) {
+      log(`Direct success: ${url}`);
+      return { url: originalUrl, success: true, time, status: res.status || 200 };
+    } else {
+      err(`Direct failed: ${res.status}`);
+      return { url: originalUrl, success: false, time, status: res.status, error: `HTTP ${res.status}` };
+    }
   } catch (error) {
-    clearTimeout(timeoutId);
+    clearTimeout(timeout);
     const time = Math.round(performance.now() - start);
-    const message = (error as Error).name === 'AbortError' ? 'Timeout' : (error as Error).message;
-    err_log(`Direct failed: ${url} (${time}ms)`, message);
-    return { url: originalUrl, success: false, time, error: message };
+    const msg = (error as Error).name === 'AbortError' ? 'Timeout (7s)' : (error as Error).message;
+    err(`Direct error: ${msg}`);
+    return { url: originalUrl, success: false, time, error: msg };
   }
 }
 
-// Proxy fetch helper
-async function tryProxy(proxyUrl: string, originalUrl: string, start: number, log: Function, err_log: Function): Promise<CheckResult> {
+// Proxy helper (GET only, 10s timeout)
+async function tryProxy(proxyUrl: string, originalUrl: string, start: number, log: Function, err: Function): Promise<CheckResult> {
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 300000); // 5 mins
+  const timeout = setTimeout(() => controller.abort(), 10000);
 
   try {
-    let response = await fetch(proxyUrl, {
-      method: 'HEAD',
-      signal: controller.signal,
-      mode: 'cors',
-      credentials: 'omit'
-    });
-
-    if (!response.ok && response.type === 'cors') {
-      log(`HEAD failed, trying GET`);
-      response = await fetch(proxyUrl, {
-        method: 'GET',
-        signal: controller.signal,
-        mode: 'cors',
-        credentials: 'omit'
-      });
-    }
-
-    clearTimeout(timeoutId);
-
-    if (!response.ok) {
-      const time = Math.round(performance.now() - start);
-      err_log(`Proxy failed: ${response.status}`);
-      return { url: originalUrl, success: false, time, error: `Proxy status ${response.status}` };
-    }
-
-    const data = await response.json();
+    const res = await fetch(proxyUrl, { method: 'GET', mode: 'cors', credentials: 'omit', signal: controller.signal });
+    clearTimeout(timeout);
     const time = Math.round(performance.now() - start);
-    const status = data.status?.http_code || response.status;
 
-    const success = status >= 200 && status < 500;
-
-    log(success ? `Proxy success: ${originalUrl} (${time}ms)` : `Proxy failed: ${status}`);
-    return {
-      url: originalUrl,
-      success,
-      time,
-      status,
-      error: success ? undefined : `Returned ${status}`
-    };
+    if (res.ok || res.type === 'opaque') {
+      log(`Proxy success: ${proxyUrl}`);
+      return { url: originalUrl, success: true, time, status: res.status || 200 };
+    } else {
+      err(`Proxy failed: ${res.status}`);
+      return { url: originalUrl, success: false, time, error: `Proxy HTTP ${res.status}` };
+    }
   } catch (error) {
-    clearTimeout(timeoutId);
+    clearTimeout(timeout);
     const time = Math.round(performance.now() - start);
-    const message = (error as Error).name === 'AbortError' ? 'Proxy timeout (5 mins)' : (error as Error).message;
-    err_log(`Proxy error: ${message}`);
-    return { url: originalUrl, success: false, time, error: message };
+    const msg = (error as Error).name === 'AbortError' ? 'Proxy timeout (10s)' : (error as Error).message;
+    err(`Proxy error: ${msg}`);
+    return { url: originalUrl, success: false, time, error: msg };
   }
 }
 
+// Batch checker (maxConcurrent = 10)
 export async function checkTrackers(urls: string[], maxConcurrent = 10): Promise<CheckResult[]> {
-  const log = (...args: any[]) => import.meta.env.DEV && console.log('[TorrentAnalyzer] Checker:', ...args);
-  log(`Starting batch check of ${urls.length} trackers (max ${maxConcurrent} concurrent)`);
-
+  const log = (...args: any[]) => import.meta.env.DEV && console.log('[TrackerBatch]', ...args);
   const results: CheckResult[] = [];
+
   for (let i = 0; i < urls.length; i += maxConcurrent) {
     const batch = urls.slice(i, i + maxConcurrent);
-    log(`Checking batch ${i / maxConcurrent + 1}: ${batch.join(', ')}`);
+    log(`Checking batch ${i / maxConcurrent + 1}/${Math.ceil(urls.length / maxConcurrent)} (${batch.length} trackers)`);
     const batchResults = await Promise.all(batch.map(checkTracker));
     results.push(...batchResults);
   }
 
-  log(`All ${results.length} checks completed`);
   return results;
 }
