@@ -26,7 +26,6 @@
   let magnetLink = '';
   let analyzing = false;
   let error = '';
-  let proxyWarning = '';
 
   let infoHash = '';
   let infoHashBase32 = '';
@@ -37,6 +36,9 @@
   let checkResults: CheckResult[] = [];
   let publicFlags: boolean[] = [];
   let analysisData: TorrentData | MagnetData | null = null;
+
+  // New: friendly, professional failure notice when insecure HTTP trackers are detected
+  let failureNotice: string | null = null;
 
   function handleUpload(event: CustomEvent<File>) {
     try {
@@ -57,7 +59,7 @@
 
     analyzing = true;
     error = '';
-    proxyWarning = '';
+    failureNotice = null;
     log('Starting analysis...');
 
     try {
@@ -96,32 +98,35 @@
       reachable = checkResults.filter((r) => r.success).length;
       log(`Reachability complete: ${reachable}/${totalTrackers} reachable`);
 
-      // Detect proxy-related failures (HTTP-only trackers)
-      const failedDueToProxy = checkResults.some(
-        (r) =>
-          !r.success &&
-          r.error &&
-          (r.error.includes('All proxies failed') ||
-           r.error.includes('Proxy timeout') ||
-           r.error.includes('Proxy HTTP') ||
-           r.error.includes('Timeout'))
-      );
-
-      if (failedDueToProxy) {
-        proxyWarning = `
-          Some of the trackers in your torrent could not be analyzed because they use 
-          <strong>insecure HTTP connections</strong> that modern browsers block by default. 
-          To ensure your privacy and connection safety, <strong>AxelBase</strong> automatically 
-          routed these requests through <em>three independent secure proxy tunnels</em>. 
-          Unfortunately, all proxy attempts were unsuccessful in reaching those trackers. 
-          <br /><br />
-          This does not affect your torrent’s data integrity — it simply means those specific 
-          trackers could not be validated over HTTPS.
-        `;
-      }
-
       tieredTrackers = groupTrackers(trackers);
       log('Trackers grouped into tiers');
+
+      // New: detect insecure HTTP trackers that failed reachability
+      const failedHttp = checkResults.filter((r) => {
+        try {
+          return !r.success && typeof r.url === 'string' && r.url.trim().toLowerCase().startsWith('http://');
+        } catch {
+          return false;
+        }
+      });
+
+      if (failedHttp.length > 0) {
+        const count = failedHttp.length;
+        failureNotice = `The torrent you uploaded includes ${count} tracker${count > 1 ? 's' : ''} that use insecure HTTP connections. At AxelBase we prioritise secure analysis: we attempted to validate those trackers using multiple proxy tunnels and secure probes, but those HTTP endpoints failed to respond securely. For your safety, the trackers remain unverified and connections using plain HTTP are considered insecure.`;
+        // Log detailed info for debugging (DEV only)
+        log('Insecure HTTP tracker failures:', failedHttp.map((r) => r.url));
+      } else if (reachable < totalTrackers) {
+        // If there are failures but not specifically HTTP, give a generic failure summary
+        const failedCount = totalTrackers - reachable;
+        if (failedCount > 0) {
+          failureNotice = `Some trackers could not be reached (${failedCount} of ${totalTrackers}). AxelBase ran the trackers through multiple proxy checks to validate connectivity; the unreachable trackers could not be verified and are reported as failed.`;
+          log('Non-HTTP tracker failures detected', failedCount);
+        } else {
+          failureNotice = null;
+        }
+      } else {
+        failureNotice = null;
+      }
 
       log('Analysis complete!');
     } catch (e: any) {
@@ -146,7 +151,7 @@
       checkResults = [];
       publicFlags = [];
       error = '';
-      proxyWarning = '';
+      failureNotice = null;
       log('State reset');
     } catch (e) {
       err('Error in reset:', e);
@@ -225,15 +230,15 @@
     <div class="alert alert-danger">{error}</div>
   {/if}
 
-  {#if proxyWarning}
-    <div class="alert alert-warning border-warning-subtle mt-3" role="alert">
-      <h5 class="alert-heading mb-2">
-        <svg class="bi flex-shrink-0 me-2" width="20" height="20" role="img" aria-label="Warning:">
-          <use xlink:href="#info-fill" />
-        </svg>
-        Tracker Security Notice
-      </h5>
-      <p class="mb-0" style="font-size: 0.95em;" innerHTML={proxyWarning}></p>
+  {#if failureNotice}
+    <div class="alert alert-warning" role="alert" aria-live="polite">
+      <strong>Tracker verification warning</strong>
+      <p style="margin:0.5rem 0 0;">
+        {failureNotice}
+      </p>
+      <p style="margin:0.5rem 0 0; font-size:0.9rem; color:var(--text-secondary,#6c757d);">
+        AxelBase performs all analysis in a privacy-preserving, sandboxed environment and uses multiple proxy tunnels to validate tracker endpoints. If you rely on these trackers, consider contacting the tracker operator to request HTTPS support or removing insecure trackers from the torrent.
+      </p>
     </div>
   {/if}
 
@@ -520,15 +525,24 @@
 </svg>
 
 <style>
-  .alert-warning {
-    background-color: #fff9e6;
-    border-left: 4px solid #ffc107;
+  .page-container {
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 2rem 1rem;
   }
-  .alert-warning h5 {
-    font-weight: 600;
-    color: #856404;
-  }
-  .alert-warning p {
-    color: #5c4c06;
-  }
+
+  /* Reused styles omitted for brevity; keep your existing styles */
+  .mb-4 { margin-bottom: 1.5rem; }
+
+  /* Alerts */
+  .alert { padding: 0.75rem 1rem; border-radius: 6px; }
+  .alert-warning { background: #fff3cd; border: 1px solid #ffeeba; color: #664d03; }
+  .alert-danger { background: #f8d7da; border: 1px solid #f5c6cb; color: #721c24; }
+  .alert-success { background: #d1e7dd; border: 1px solid #badbcc; color: #0f5132; }
+  .alert-info { background: #cff4fc; border: 1px solid #b6effb; color: #055160; }
+
+  /* Buttons and other page styles kept as in your original stylesheet */
+  .btn { display: inline-flex; align-items: center; gap: .5rem; padding: .5rem .9rem; border-radius: 6px; }
+  .btn-primary { background: var(--accent-primary, #007bff); color: #fff; border: none; cursor: pointer; }
+  .btn-primary[disabled] { opacity: .65; cursor: not-allowed; }
 </style>
