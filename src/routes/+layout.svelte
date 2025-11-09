@@ -5,7 +5,7 @@
   import '../app.css'; // Import our new custom styles
 
   // --- Buy me a coffee logic ---
-  const paypalUsername = 'YOUR_USERNAME'; // !! IMPORTANT: Update this
+  const paypalUsername = 'AxelLab427'; // !! IMPORTANT: Update this
   const donationAmounts = [1, 3, 5, 10];
   let isDropdownOpen = false;
 

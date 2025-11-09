@@ -13,6 +13,13 @@ export async function checkTracker(url: string): Promise<CheckResult> {
   const log = (...args: any[]) => import.meta.env.DEV && console.log('[TorrentAnalyzer] Checker:', ...args);
   const err = (...args: any[]) => import.meta.env.DEV && console.error('[TorrentAnalyzer] Checker:', ...args);
 
+  // Detect and handle mixed content for HTTP trackers on HTTPS sites
+  if (location.protocol === 'https:' && url.startsWith('http://')) {
+    const errorMsg = 'Mixed content blocked: HTTP tracker cannot be fetched from HTTPS site.';
+    err(errorMsg);
+    return { url, success: false, time: 0, error: errorMsg };
+  }
+
   try {
     if (url.startsWith('udp://')) {
       log(`Skipping UDP tracker (not checkable): ${url}`);
@@ -41,7 +48,6 @@ export async function checkTracker(url: string): Promise<CheckResult> {
   }
 }
 
-/* ←←← ADD THIS FUNCTION ←←← */
 export async function checkTrackers(urls: string[], maxConcurrent: number = 10): Promise<CheckResult[]> {
   const log = (...args: any[]) => import.meta.env.DEV && console.log('[TorrentAnalyzer] Checker:', ...args);
   log(`Starting batch check of ${urls.length} trackers (max ${maxConcurrent} concurrent)`);
