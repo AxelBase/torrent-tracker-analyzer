@@ -8,36 +8,46 @@ export interface CheckResult {
   error?: string;
 }
 
-// Reliable CORS proxy (supports HEAD + GET)
+// CORS proxy
 const PROXY_URL = 'https://corsproxy.io/?';
 
 export async function checkTracker(originalUrl: string): Promise<CheckResult> {
   const start = performance.now();
-  const log = (...args: any[]) => import.meta.env.DEV && console.log('[TorrentAnalyzer] Checker:', ...args);
-  const err = (...args: any[]) => import.meta.env.DEV && console.error('[TorrentAnalyzer] Checker:', ...args);
+
+  // Define log and err here to ensure scope
+  const log = (...args: any[]) => {
+    if (import.meta.env.DEV) {
+      console.log('[TorrentAnalyzer] Checker:', ...args);
+    }
+  };
+  const err_log = (...args: any[]) => {
+    if (import.meta.env.DEV) {
+      console.error('[TorrentAnalyzer] Checker:', ...args);
+    }
+  };
 
   let url = originalUrl;
 
-  // === CASE 1: HTTP tracker on HTTPS site → Use proxy ===
+  // CASE 1: HTTP on HTTPS → Proxy
   if (location.protocol === 'https:' && url.startsWith('http://')) {
     const proxyUrl = PROXY_URL + encodeURIComponent(url);
-    log(`Using corsproxy.io for HTTP tracker: ${proxyUrl}`);
-    return await tryProxyWithFallback(proxyUrl, originalUrl, start);
+    log(`Using proxy for HTTP: ${proxyUrl}`);
+    return await tryProxy(proxyUrl, originalUrl, start, log, err_log);
   }
 
-  // === CASE 2: UDP → Skip ===
+  // CASE 2: UDP
   if (url.startsWith('udp://')) {
     log(`Skipping UDP: ${url}`);
-    return { url, success: false, time: 0, error: 'UDP not supported in browser' };
+    return { url, success: false, time: 0, error: 'UDP not supported' };
   }
 
-  // === CASE 3: Direct fetch for (HTTPS or localhost) ===
+  // CASE 3: Direct
   log(`Direct check: ${url}`);
-  return await tryDirect(url, originalUrl, start);
+  return await tryDirect(url, originalUrl, start, log, err_log);
 }
 
-// Direct HEAD (no-cors)
-async function tryDirect(url: string, originalUrl: string, start: number): Promise<CheckResult> {
+// Direct fetch helper
+async function tryDirect(url: string, originalUrl: string, start: number, log: Function, err_log: Function): Promise<CheckResult> {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), 5000);
 
@@ -51,22 +61,23 @@ async function tryDirect(url: string, originalUrl: string, start: number): Promi
 
     clearTimeout(timeoutId);
     const time = Math.round(performance.now() - start);
+    log(`Direct success: ${url} (${time}ms)`);
     return { url: originalUrl, success: true, time };
   } catch (error) {
     clearTimeout(timeoutId);
     const time = Math.round(performance.now() - start);
     const message = (error as Error).name === 'AbortError' ? 'Timeout' : (error as Error).message;
+    err_log(`Direct failed: ${url} (${time}ms)`, message);
     return { url: originalUrl, success: false, time, error: message };
   }
 }
 
-// Proxy: Try HEAD → fallback to GET
-async function tryProxyWithFallback(proxyUrl: string, originalUrl: string, start: number): Promise<CheckResult> {
+// Proxy fetch helper
+async function tryProxy(proxyUrl: string, originalUrl: string, start: number, log: Function, err_log: Function): Promise<CheckResult> {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), 300000); // 5 mins
 
   try {
-    // Try HEAD first
     let response = await fetch(proxyUrl, {
       method: 'HEAD',
       signal: controller.signal,
@@ -74,9 +85,8 @@ async function tryProxyWithFallback(proxyUrl: string, originalUrl: string, start
       credentials: 'omit'
     });
 
-    // If HEAD fails (CORS), try GET
     if (!response.ok && response.type === 'cors') {
-      log(`HEAD failed, trying GET via proxy`);
+      log(`HEAD failed, trying GET`);
       response = await fetch(proxyUrl, {
         method: 'GET',
         signal: controller.signal,
@@ -89,28 +99,29 @@ async function tryProxyWithFallback(proxyUrl: string, originalUrl: string, start
 
     if (!response.ok) {
       const time = Math.round(performance.now() - start);
+      err_log(`Proxy failed: ${response.status}`);
       return { url: originalUrl, success: false, time, error: `Proxy status ${response.status}` };
     }
 
+    const data = await response.json();
     const time = Math.round(performance.now() - start);
-
-    // For GET: parse status from headers if available
-    const statusHeader = response.headers.get('x-cors-api-status') || response.headers.get('access-control-expose-headers');
-    const status = statusHeader ? parseInt(statusHeader) : response.status;
+    const status = data.status?.http_code || response.status;
 
     const success = status >= 200 && status < 500;
 
+    log(success ? `Proxy success: ${originalUrl} (${time}ms)` : `Proxy failed: ${status}`);
     return {
       url: originalUrl,
       success,
       time,
       status,
-      error: success ? undefined : `Tracker returned ${status}`
+      error: success ? undefined : `Returned ${status}`
     };
   } catch (error) {
     clearTimeout(timeoutId);
     const time = Math.round(performance.now() - start);
     const message = (error as Error).name === 'AbortError' ? 'Proxy timeout (5 mins)' : (error as Error).message;
+    err_log(`Proxy error: ${message}`);
     return { url: originalUrl, success: false, time, error: message };
   }
 }
