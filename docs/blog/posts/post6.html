@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+        <title>AxelBase – Torrent Tracker Analyzer</title>
+		<link rel="icon" href="../../AxelLab-Logo.ico" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		
+		<link href="../../_app/immutable/assets/0.DjU3QmFN.css" rel="stylesheet">
+		<link href="../../_app/immutable/assets/9.DDBNE_5C.css" rel="stylesheet">
+		<link rel="modulepreload" href="../../_app/immutable/entry/start.DKJcRVyn.js">
+		<link rel="modulepreload" href="../../_app/immutable/chunks/BKsC52NV.js">
+		<link rel="modulepreload" href="../../_app/immutable/chunks/XdnX5puW.js">
+		<link rel="modulepreload" href="../../_app/immutable/chunks/DI6-Rt3a.js">
+		<link rel="modulepreload" href="../../_app/immutable/chunks/Dm4jRLCS.js">
+		<link rel="modulepreload" href="../../_app/immutable/entry/app.CGn6BFwY.js">
+		<link rel="modulepreload" href="../../_app/immutable/chunks/OiQYT4Tg.js">
+		<link rel="modulepreload" href="../../_app/immutable/chunks/2nrINpoM.js">
+		<link rel="modulepreload" href="../../_app/immutable/chunks/cV7mX2QQ.js">
+		<link rel="modulepreload" href="../../_app/immutable/chunks/DbeSBaHL.js">
+		<link rel="modulepreload" href="../../_app/immutable/nodes/0.DFDwfUQ0.js">
+		<link rel="modulepreload" href="../../_app/immutable/chunks/Ce3UzmR8.js">
+		<link rel="modulepreload" href="../../_app/immutable/chunks/B0ezyt36.js">
+		<link rel="modulepreload" href="../../_app/immutable/chunks/BZkn84eA.js">
+		<link rel="modulepreload" href="../../_app/immutable/chunks/CExB7J8A.js">
+		<link rel="modulepreload" href="../../_app/immutable/nodes/9.B_IFteDy.js">
+		<link rel="modulepreload" href="../../_app/immutable/chunks/NUOpUFcK.js"><!--q8x3kg--><meta name="description" content="Discover how we built an accessible, responsive drag-and-drop file uploader with instant feedback, keyboard support, and .torrent validation."/> <meta property="og:title" content="Building a Drag-and-Drop File Uploader | AxelBase Blog"/> <meta property="og:description" content="Discover how we built an accessible, responsive drag-and-drop file uploader with instant feedback, keyboard support, and .torrent validation."/> <meta property="og:url" content="../../blog/posts/post6"/> <meta property="og:type" content="article"/> <meta name="twitter:card" content="summary_large_image"/><!----><title>Building a Drag-and-Drop File Uploader | AxelBase Blog</title>
+	</head>
+	<body data-sveltekit-preload-data="hover">
+		<div style="display: contents"><!--[--><!--[--><!----><header class="navbar-sticky"><nav class="container"><div class="nav-left"><a href="../../" class="nav-brand" aria-label="Home"><img src="../../AxelLab-Logo.ico" alt="AxelBase Logo" class="logo"/> <span>AxelBase</span></a> <div class="bmac-wrapper"><button class="bmac-button" title="Support the developer"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12.35,22.2L12,22A10,10,0,0,1,2,12V10A2,2,0,0,1,4,8H7.2A5.13,5.13,0,0,1,12,3A5.13,5.13,0,0,1,16.8,8H20A2,2,0,0,1,22,10V12A10,10,0,0,1,12.35,22.2M4,10V12A8,8,0,0,0,12,20A8,8,0,0,0,20,12V10H16.8A5.11,5.11,0,0,1,12.5,5.12A5.15,5.15,0,0,1,7.2,10H4Z"></path></svg> Buy me a coffee</button> <!--[!--><!--]--></div></div> <div class="nav-right"><ul><li><a class="nav-link" href="../../">Home</a></li> <li><a class="nav-link" href="../../#about">About</a></li> <li><a class="nav-link" href="../../#how-to-use">How to use</a></li> <li><a class="nav-link" href="../../#faq">FAQ</a></li> <li><a class="nav-link" href="../../blog">Blog</a></li></ul></div></nav></header> <main class="main-content"><!--[--><!----><div class="container fade-in post-layout svelte-q8x3kg"><div class="breadcrumbs svelte-q8x3kg"><a href="../../blog" class="svelte-q8x3kg">Blog</a> <span>/</span> <p class="svelte-q8x3kg">Building a Drag-and-Drop File Uploader</p></div> <article class="prose svelte-q8x3kg"><h1 class="svelte-q8x3kg">Building a Drag-and-Drop File Uploader</h1> <p class="post-meta svelte-q8x3kg">Published: November 20, 2025</p> <p class="svelte-q8x3kg">The <strong>Torrent Tracker Analyzer</strong> starts with a seamless file upload experience. Here’s how we built a **drag-and-drop uploader** that’s accessible, fast, and user-friendly.</p> <h2 class="svelte-q8x3kg">Core Requirements</h2> <ul class="svelte-q8x3kg"><li class="svelte-q8x3kg">Click to upload or drag &amp; drop</li> <li class="svelte-q8x3kg">Instant feedback with file name and size</li> <li class="svelte-q8x3kg">Keyboard accessible (Enter/Space)</li> <li class="svelte-q8x3kg">Only accept <code>.torrent</code> files</li> <li class="svelte-q8x3kg">Works on mobile and desktop</li></ul> <h2 class="svelte-q8x3kg">Drag &amp; Drop API</h2> <p class="svelte-q8x3kg">We listen to <code>dragover</code>, <code>dragleave</code>, and <code>drop</code> events. <code>preventDefault()</code> is critical to allow dropping.</p> <h3 class="svelte-q8x3kg">Visual Feedback</h3> <p class="svelte-q8x3kg">A <code>.drag-over</code> class changes border and background during drag.</p> <h2 class="svelte-q8x3kg">Keyboard Support</h2> <p class="svelte-q8x3kg">Pressing <kbd>Enter</kbd> or <kbd>Space</kbd> triggers the hidden file input.</p> <h2 class="svelte-q8x3kg">Validation</h2> <p class="svelte-q8x3kg">We check <code>file.name.endsWith('.torrent')</code> and show an alert if invalid.</p> <h2 class="svelte-q8x3kg">Accessibility (a11y)</h2> <ul class="svelte-q8x3kg"><li class="svelte-q8x3kg"><code>aria-label</code> on drop zone</li> <li class="svelte-q8x3kg">Focus outline on keyboard navigation</li> <li class="svelte-q8x3kg">Screen reader announces upload</li></ul> <h2 class="svelte-q8x3kg">FAQ</h2> <details class="svelte-q8x3kg"><summary class="svelte-q8x3kg">Why not use &lt;input type="file" /> directly?</summary> <p class="svelte-q8x3kg">Hidden inputs can’t be styled. A custom zone offers better UX.</p></details> <details class="svelte-q8x3kg"><summary class="svelte-q8x3kg">Does it work on iOS?</summary> <p class="svelte-q8x3kg">Yes. Tap to open picker; drag &amp; drop works in Safari 14+.</p></details> <p class="italic-note svelte-q8x3kg">Try the uploader: <a href="../../">Go to Analyzer</a></p></article></div><!----><!--]--></main> <footer class="footer-fixed"><div class="container"><p>© 2025 AxelBase Torrent Tracker Analyzer</p> <div><a href="../../privacy">Privacy Policy</a> <a href="../../terms">Terms &amp; Conditions</a></div></div></footer><!----><!--]--> <!--[!--><!--]--><!--]-->
+			
+			<script>
+				{
+					__sveltekit_1fkmerc = {
+						base: new URL("../..", location).pathname.slice(0, -1),
+						assets: "/torrent-tracker-analyzer"
+					};
+
+					const element = document.currentScript.parentElement;
+
+					Promise.all([
+						import("../../_app/immutable/entry/start.DKJcRVyn.js"),
+						import("../../_app/immutable/entry/app.CGn6BFwY.js")
+					]).then(([kit, app]) => {
+						kit.start(app, element, {
+							node_ids: [0, 9],
+							data: [null,null],
+							form: null,
+							error: null
+						});
+					});
+				}
+			</script>
+		</div>
+	</body>
+</html>
