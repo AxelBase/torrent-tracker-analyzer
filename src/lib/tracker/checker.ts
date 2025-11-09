@@ -31,7 +31,7 @@ export async function checkTracker(originalUrl: string): Promise<CheckResult> {
     return { url, success: false, time: 0, error: 'UDP not supported in browser' };
   }
 
-  // === CASE 3: Direct fetch (HTTPS or localhost) ===
+  // === CASE 3: Direct fetch for (HTTPS or localhost) ===
   log(`Direct check: ${url}`);
   return await tryDirect(url, originalUrl, start);
 }
