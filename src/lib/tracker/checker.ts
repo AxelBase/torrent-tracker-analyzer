@@ -13,11 +13,11 @@ export async function checkTracker(url: string): Promise<CheckResult> {
   const log = (...args: any[]) => import.meta.env.DEV && console.log('[TorrentAnalyzer] Checker:', ...args);
   const err = (...args: any[]) => import.meta.env.DEV && console.error('[TorrentAnalyzer] Checker:', ...args);
 
-  // Detect and handle mixed content for HTTP trackers on HTTPS sites
-  if (location.protocol === 'https:' && url.startsWith('http://')) {
-    const errorMsg = 'Mixed content blocked: HTTP tracker cannot be fetched from HTTPS site.';
-    err(errorMsg);
-    return { url, success: false, time: 0, error: errorMsg };
+  // Upgrade HTTP to HTTPS to avoid mixed content blocks
+  if (url.startsWith('http://')) {
+    const httpsUrl = url.replace('http://', 'https://');
+    log(`Upgrading HTTP to HTTPS to avoid mixed content: ${httpsUrl}`);
+    url = httpsUrl;
   }
 
   try {
@@ -43,8 +43,15 @@ export async function checkTracker(url: string): Promise<CheckResult> {
     return { url, success: true, time, status: undefined };
   } catch (error) {
     const time = Math.round(performance.now() - start);
-    err(`Failed: ${url} (${time}ms)`, error);
-    return { url, success: false, time, error: (error as Error).message };
+    let errorMsg = (error as Error).message;
+
+    // Customize error for mixed content if still occurs
+    if (errorMsg.includes('Mixed Content') || errorMsg.includes('insecure')) {
+      errorMsg = 'Mixed content blocked: HTTP tracker cannot be fetched from HTTPS site. Use HTTPS trackers.';
+    }
+
+    err(`Failed: ${url} (${time}ms)`, errorMsg);
+    return { url, success: false, time, error: errorMsg };
   }
 }
 
