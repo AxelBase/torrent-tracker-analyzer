@@ -26,6 +26,7 @@
   let magnetLink = '';
   let analyzing = false;
   let error = '';
+  let proxyWarning = '';
 
   let infoHash = '';
   let infoHashBase32 = '';
@@ -56,6 +57,7 @@
 
     analyzing = true;
     error = '';
+    proxyWarning = '';
     log('Starting analysis...');
 
     try {
@@ -94,6 +96,30 @@
       reachable = checkResults.filter((r) => r.success).length;
       log(`Reachability complete: ${reachable}/${totalTrackers} reachable`);
 
+      // Detect proxy-related failures (HTTP-only trackers)
+      const failedDueToProxy = checkResults.some(
+        (r) =>
+          !r.success &&
+          r.error &&
+          (r.error.includes('All proxies failed') ||
+           r.error.includes('Proxy timeout') ||
+           r.error.includes('Proxy HTTP') ||
+           r.error.includes('Timeout'))
+      );
+
+      if (failedDueToProxy) {
+        proxyWarning = `
+          Some of the trackers in your torrent could not be analyzed because they use 
+          <strong>insecure HTTP connections</strong> that modern browsers block by default. 
+          To ensure your privacy and connection safety, <strong>AxelBase</strong> automatically 
+          routed these requests through <em>three independent secure proxy tunnels</em>. 
+          Unfortunately, all proxy attempts were unsuccessful in reaching those trackers. 
+          <br /><br />
+          This does not affect your torrent’s data integrity — it simply means those specific 
+          trackers could not be validated over HTTPS.
+        `;
+      }
+
       tieredTrackers = groupTrackers(trackers);
       log('Trackers grouped into tiers');
 
@@ -120,6 +146,7 @@
       checkResults = [];
       publicFlags = [];
       error = '';
+      proxyWarning = '';
       log('State reset');
     } catch (e) {
       err('Error in reset:', e);
@@ -165,7 +192,6 @@
 
   <div class="mb-3">
     <label for="magnet-input" class="form-label">Paste magnet link</label>
-    <!-- FIXED: Use explicit closing tag instead of self-closing -->
     <textarea
       id="magnet-input"
       bind:value={magnetLink}
@@ -197,6 +223,18 @@
 
   {#if error}
     <div class="alert alert-danger">{error}</div>
+  {/if}
+
+  {#if proxyWarning}
+    <div class="alert alert-warning border-warning-subtle mt-3" role="alert">
+      <h5 class="alert-heading mb-2">
+        <svg class="bi flex-shrink-0 me-2" width="20" height="20" role="img" aria-label="Warning:">
+          <use xlink:href="#info-fill" />
+        </svg>
+        Tracker Security Notice
+      </h5>
+      <p class="mb-0" style="font-size: 0.95em;" innerHTML={proxyWarning}></p>
+    </div>
   {/if}
 
   {#if analysisData}
@@ -480,3 +518,17 @@
     />
   </symbol>
 </svg>
+
+<style>
+  .alert-warning {
+    background-color: #fff9e6;
+    border-left: 4px solid #ffc107;
+  }
+  .alert-warning h5 {
+    font-weight: 600;
+    color: #856404;
+  }
+  .alert-warning p {
+    color: #5c4c06;
+  }
+</style>

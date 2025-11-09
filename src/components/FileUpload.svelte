@@ -76,11 +76,6 @@
       }
 
       log('File input changed:', file.name, file.size, 'bytes');
-      if (!file.name.endsWith('.torrent')) {
-        alert('Please upload a .torrent file');
-        return;
-      }
-
       dispatch('upload', file);
       log('File dispatched from input');
     } catch (e) {
@@ -106,16 +101,6 @@
       }
     } catch (e) {
       err('Error in handleKeyDown:', e);
-    }
-  }
-
-  function triggerFileDialog(e: MouseEvent) {
-    try {
-      e.stopPropagation();
-      log('Select button clicked → opening file picker');
-      fileInput.click();
-    } catch (e) {
-      err('Error in triggerFileDialog:', e);
     }
   }
 </script>
@@ -144,12 +129,6 @@
   />
 </div>
 
-<div class="file-upload-controls" style="margin-top:0.75rem;">
-  <button class="btn btn-secondary" type="button" on:click={triggerFileDialog}>
-    Select .torrent file
-  </button>
-</div>
-
 <style>
   .drop-zone {
     border: 2px dashed #ccc;
@@ -171,13 +150,5 @@
     display: block;
     cursor: pointer;
     margin-bottom: 0;
-  }
-  .d-none {
-    display: none;
-  }
-  .file-upload-controls {
-    display: flex;
-    gap: 0.5rem;
-    justify-content: center;
   }
 </style>
